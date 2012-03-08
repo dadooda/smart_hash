@@ -31,6 +31,12 @@ class SmartHash < Hash
   attr_reader :protected_attrs
 
   # Strict mode. Default is <tt>true</tt>.
+  #
+  #   person = SmartHash[]
+  #   person.invalid_stuff    # KeyError: key not found: :invalid_stuff
+  #
+  #   person.strict = false
+  #   person.invalid_stuff    # => nil
   attr_accessor :strict
 
   def initialize(*args)
@@ -40,7 +46,7 @@ class SmartHash < Hash
 
   # Alternative constructor.
   #
-  #   h = SmartHash[]
+  #   person = SmartHash[]
   def self.[](*args)
     super.tap do |_|
       _.instance_eval do
@@ -49,7 +55,7 @@ class SmartHash < Hash
     end
   end
 
-  # Declare specific attributes. By declaring the attributes you ensure that there's no
+  # Declare attributes. By declaring the attributes you ensure that there's no
   # interference from existing methods.
   # 
   #   person = SmartHash[]
@@ -69,10 +75,15 @@ class SmartHash < Hash
     end
   end
 
-  # Protect attributes against assignment.
+  # Protect attributes from being assigned.
   #
-  #   r.protect(:size)
-  #   r.size = 1    # Exception.
+  #   person = SmartHash[]
+  #   person.name = "John"
+  #   person.protect(:name)
+  #
+  #   person.name = "Bob"     # ArgumentError: Attribute 'name' is protected
+  #
+  # See also #unprotect.
   def protect(*attrs)
     raise ArgumentError, "No attrs specified" if attrs.empty?
     attrs.each do |attr|
@@ -106,7 +117,7 @@ class SmartHash < Hash
   end
 
   # Common post-initialize routine.
-  def _smart_hash_init
+  def _smart_hash_init      #:nodoc:
     @declared_attrs = Set[]
     @strict = true
 
@@ -176,19 +187,5 @@ class SmartHash < Hash
     else
       super
     end
-  end
-end
-
-#--------------------------------------- Junk
-
-# Decided to keep original Hash#inspect, it's more sane with log output.
-if false
-  def inspect
-    [
-      self.class.to_s,
-      "[",
-      super[1..-2],
-      "]",
-    ].join
   end
 end
