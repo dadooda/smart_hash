@@ -12,57 +12,7 @@ require File.expand_path("../smart_hash/loose", __FILE__)
 # * You can use <b>any</b> attribute names.
 # * Descends from `Hash` and inherits its rich feature set.
 #
-# === Basic Usage
-#
-# Create an object and set a few attributes:
-#
-#   >> person = SmartHash[]
-#   >> person.name = "John"
-#   >> person.age = 25
-#
-#   >> person
-#   => {:name=>"John", :age=>25}
-# 
-# Read attributes:
-# 
-#
-#   >> person.name
-#   => "John"
-#   >> person[:name]
-#   => "John"
-# 
-# Access an unset attribute:
-# 
-#   >> person.invalid_stuff
-#   KeyError: key not found: :invalid_stuff
-#   >> person[:invalid_stuff]
-#   => nil
-# 
-# Please note that `[]` access is always non-strict since `SmartHash` behaves as `Hash` here.
-# 
-# Manipulate attributes which exist as methods:
-# 
-#   >> person = SmartHash[:name => "John"]
-#   >> person.size
-#   => 1
-#   >> person.size = "XL"
-#   >> person.size
-#   => "XL"
-# 
-# **IMPORTANT:** You can use any attribute names excluding these: `default`, `default_proc`, `strict`.
-# 
-# Use `Hash` features, e.g. merge:
-# 
-#   >> person = SmartHash[:name => "John"]
-#   >> person.merge(:surname => "Smith", :age => 25)
-#   => {:name=>"John", :surname=>"Smith", :age=>25}
-# 
-# , or iterate:
-# 
-#   >> person.each {|k, v| puts "#{k}: #{v}"}
-#   name: John
-#   surname: Smith
-#   age: 25
+# See {rubydoc documentation}[http://rubydoc.info/github/dadooda/smart_hash/master/frames] for basic usage examples.
 class SmartHash < Hash
   # Attribute name regexp without delimiters.
   ATTR_REGEXP = /[a-zA-Z_]\w*/
@@ -99,14 +49,17 @@ class SmartHash < Hash
     end
   end
 
-  # Declare that specific key(s) are going to be used as attributes.
-  # Thus, exception will be raised when trying to access declared attributes if they are not set,
-  # even if the corresponding method exists in Hash class.
+  # Declare specific attributes. By declaring the attributes you ensure that there's no
+  # interference from existing methods.
+  # 
+  #   person = SmartHash[]
+  #   person.declare(:size)
+  #   person.size             # KeyError: key not found: :size
   #
-  #   r.declare(:size)
-  #   r.size            # `KeyError` or `IndexError` will be raised.
+  #   person.size = "XL"
+  #   person.size             # => "XL"
   #
-  #   r.declare(:count, :size)    # Declare more than one attribute at once.
+  # See also #undeclare.
   def declare(*attrs)
     raise ArgumentError, "No attrs specified" if attrs.empty?
     attrs.each do |attr|

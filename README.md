@@ -92,7 +92,7 @@ surname: Smith
 age: 25
 ~~~
 
-Suppose you want to disable the strict mode:
+Suppose you want to disable strict mode:
 
 ~~~
 >> person = SmartHash[]
@@ -114,7 +114,7 @@ Suppose you want to disable the strict mode:
 => nil
 ~~~
 
-Suppose you **know** you will use the `size` attribute and you don't want any interference from the `#size` method. Use attribute declaration:
+Suppose you **know** you will use the `size` attribute and you don't want any interference with the `#size` method. Use attribute declaration:
 
 ~~~
 >> person = SmartHash[]
@@ -136,6 +136,16 @@ Suppose you set an attribute and want to ensure that it's not overwritten. Use a
 >> person.name = "Bob"
 ArgumentError: Attribute 'name' is protected
 ~~~
+
+
+Compatibility
+-------------
+
+Tested to run on:
+
+* Ruby 1.9.2-p180, Linux, RVM
+
+Compatibility issue reports will be greatly appreciated.
 
 
 Copyright
