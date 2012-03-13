@@ -28,9 +28,6 @@ class SmartHash < Hash
   # Forbidden attrs cannot be manupulated as such and are handled as methods only.
   FORBIDDEN_ATTRS = [:default, :default_proc, :strict]
 
-  # Gem version.
-  VERSION = "0.1.0"
-
   # See #declare.
   attr_reader :declared_attrs
 
