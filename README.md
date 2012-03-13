@@ -6,9 +6,9 @@ IMPORTANT INFORMATION, 2012-03-13
 ---------------------------------
 
 I've recently discovered a performance issue with `SmartHash`, noticeable when you make thousands of lookups.
-It does not affect the overall behavior, all specs pass, but the solution certainly needs to be found to solve it.
+It does not affect the overall behavior, all specs pass, but it certainly needs to be fixed.
 
-I'm working on fixing the performance issue.
+I'm working on fixing this issue.
 
 
 Introduction
@@ -29,7 +29,7 @@ Setup
 $ gem install smart_hash
 ~~~
 
-, or via Bundler's `Gemfile`:
+Or using Bundler's `Gemfile`:
 
 ~~~
 gem "smart_hash"
