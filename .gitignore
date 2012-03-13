@@ -2,10 +2,10 @@
 .ref-*
 .old*
 *-old*
+/.rvmrc
 
 # Project-specific.
 /*.rb
 /doc/
 /pkg/
-/.rvmrc
 /.yardoc

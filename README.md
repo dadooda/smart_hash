@@ -2,6 +2,15 @@
 A smarter alternative to OpenStruct
 ===================================
 
+IMPORTANT INFORMATION, 2012-03-13
+---------------------------------
+
+I've recently discovered a performance issue with `SmartHash`, noticeable when you make thousands of lookups.
+It does not affect the overall behavior, all specs pass, but the solution certainly needs to be found to solve it.
+
+I'm working on fixing the performance issue.
+
+
 Introduction
 ------------
 
