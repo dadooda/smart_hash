@@ -1,7 +1,14 @@
 require "set"
 
-# Get us `SmartHash::Loose`. It's usually `Dir[]` in other gems, but we've only got 1 file at the moment.
-require File.expand_path("../smart_hash/loose", __FILE__)
+# Load our stuff.
+# NOTE: Our includes are capable of being loaded in arbitrary order (for spec and stuff), hence the `< Hash` in each of them.
+[
+  "smart_hash/**/*.rb",
+].each do |fmask|
+  Dir[File.expand_path("../#{fmask}", __FILE__)].each do |fn|
+    require fn
+  end
+end
 
 # == A smarter alternative to OpenStruct
 #
@@ -67,10 +74,10 @@ class SmartHash < Hash
   #
   # See also #undeclare.
   def declare(*attrs)
-    raise ArgumentError, "No attrs specified" if attrs.empty?
+    raise ArgumentError, "No attributes specified" if attrs.empty?
     attrs.each do |attr|
-      (v = attr).is_a?(klass = Symbol) or raise ArgumentError, "#{klass} expected, #{v.class} (#{v.inspect}) given"
-      attr.to_s.match /\A#{ATTR_REGEXP}\z/ or raise ArgumentError, "Incorrect attribute name '#{attr}'"
+      [attr, Symbol].tap {|v, klass| v.is_a?(klass) or raise ArgumentError, "#{klass} expected, #{v.class} (#{v.inspect}) given"}
+      attr.to_s.match /\A#{ATTR_REGEXP}\z/ or raise ArgumentError, "Incorrect attribute name: #{attr}"
       @declared_attrs << attr   # `Set` is returned.
     end
   end
@@ -85,23 +92,23 @@ class SmartHash < Hash
   #
   # See also #unprotect.
   def protect(*attrs)
-    raise ArgumentError, "No attrs specified" if attrs.empty?
+    raise ArgumentError, "No attributes specified" if attrs.empty?
     attrs.each do |attr|
-      (v = attr).is_a?(klass = Symbol) or raise ArgumentError, "#{klass} expected, #{v.class} (#{v.inspect}) given"
-      attr.to_s.match /\A#{ATTR_REGEXP}\z/ or raise ArgumentError, "Incorrect attribute name '#{attr}'"
+      [attr, Symbol].tap {|v, klass| v.is_a?(klass) or raise ArgumentError, "#{klass} expected, #{v.class} (#{v.inspect}) given"}
+      attr.to_s.match /\A#{ATTR_REGEXP}\z/ or raise ArgumentError, "Incorrect attribute name: #{attr}"
       @protected_attrs << attr
     end
   end
 
   def undeclare(*attrs)
-    raise ArgumentError, "No attrs specified" if attrs.empty?
+    raise ArgumentError, "No attributes specified" if attrs.empty?
     attrs.each do |attr|
       @declared_attrs.delete(attr)    # `Set` is returned.
     end
   end
 
   def unprotect(*attrs)
-    raise ArgumentError, "No attrs specified" if attrs.empty?
+    raise ArgumentError, "No attributes specified" if attrs.empty?
     attrs.each do |attr|
       @protected_attrs.delete(attr)
     end
@@ -110,7 +117,7 @@ class SmartHash < Hash
   private
 
   # Make private copies of methods we need.
-  [:fetch, :instance_eval].each do |method_name|
+  [:fetch].each do |method_name|
     my_method_name = "_smart_hash_#{method_name}".to_sym
     alias_method my_method_name, method_name
     private my_method_name
@@ -118,6 +125,10 @@ class SmartHash < Hash
 
   # Common post-initialize routine.
   def _smart_hash_init      #:nodoc:
+    # At early stages of construction via `[]` half-ready instances might be accessed.
+    # Do determine such situations we need a flag.
+    @is_initialized = true
+
     @declared_attrs = Set[]
     @strict = true
 
@@ -126,45 +137,66 @@ class SmartHash < Hash
     # he'll find a way to do it anyway.
     @protected_attrs = Set[:inspect, :to_s]
 
-    # Suppress warnings.
-    vrb, $VERBOSE = $VERBOSE, nil
+    # Extend own class with dynamic methods if needed.
+    if not self.class < DynamicMethods
+      method_names = methods.map(&:to_s)
 
-    # Insert lookup routine for existing methods, such as <tt>size</tt>.
-    methods.map(&:to_s).each do |method_name|
-      # Install control routine on correct attribute access methods only.
-      # NOTE: Check longer REs first.
-      case method_name
-      when /\A(#{ATTR_REGEXP})=\z/
-        # Case "r.attr=".
-        attr = $1.to_sym
-        next if FORBIDDEN_ATTRS.include? attr
-        _smart_hash_instance_eval <<-EOT
-          def #{method_name}(value)
-            raise ArgumentError, "Attribute '#{attr}' is protected" if @protected_attrs.include? :#{attr}
-            self[:#{attr}] = value
-          end
-        EOT
-      when /\A#{ATTR_REGEXP}\z/
-        # Case "r.attr".
-        next if FORBIDDEN_ATTRS.include? attr
-        _smart_hash_instance_eval <<-EOT
-          def #{method_name}(*args)
-            if @declared_attrs.include?(:#{method_name}) or has_key?(:#{method_name})
-              if @strict
-                _smart_hash_fetch(:#{method_name})
+      # Skip methods matching forbidden attrs.
+      method_names -= FORBIDDEN_ATTRS.map(&:to_s) + FORBIDDEN_ATTRS.map {|_| "#{_}="}
+
+      # Collect pieces of code.
+      pcs = []
+
+      method_names.each do |method_name|
+        case method_name
+        when /\A(#{ATTR_REGEXP})=\z/
+          # Assignment.
+          attr = $1.to_sym
+          # NOTE: See `@is_initialized` checks -- our code must take control only when the object is fully initialized.
+          pcs << %{
+            def #{method_name}(value)
+              if @is_initialized
+                if @protected_attrs.include? :#{attr}
+                  raise ArgumentError, "Attribute is protected: #{attr}"
+                else
+                  self[:#{attr}] = value
+                end
               else
-                self[:#{method_name}]
+                super
               end
-            else
-              super
             end
-          end
-        EOT
-      end # case
-    end # each
+          } # pcs <<
+        when /\A(#{ATTR_REGEXP})\z/
+          # Access.
+          attr = $1.to_sym
+          pcs << %{
+            def #{method_name}(*args)
+              if @is_initialized and (@declared_attrs.include?(:#{attr}) or has_key?(:#{attr}))
+                if @strict
+                  _smart_hash_fetch(:#{attr})
+                else
+                  self[:#{attr}]
+                end
+              else
+                super
+              end
+            end
+          } # pcs <<
+        end # case
+      end # method_names.each
 
-    # Restore warnings.
-    $VERBOSE = vrb
+      # Suppress warnings.
+      vrb, $VERBOSE = $VERBOSE, nil
+
+      # Create dynamic methods.
+      DynamicMethods.class_eval pcs.join("\n")
+
+      # Restore warnings.
+      $VERBOSE = vrb
+
+      # Include dynamic methods.
+      self.class.class_eval "include DynamicMethods"
+    end
   end
 
   def method_missing(method_name, *args)
@@ -172,17 +204,17 @@ class SmartHash < Hash
 
     case method_name
     when /\A(.+)=\z/
-      # Case "r.attr=". Attribute assignment. Method name is pre-validated for us by Ruby.
+      # Assignment. Method name is pre-validated for us by Ruby.
       attr = $1.to_sym
-      raise ArgumentError, "Attribute '#{attr}' is protected" if @protected_attrs.include? attr
-
+      raise ArgumentError, "Attribute is protected: #{attr}" if @protected_attrs.include? attr
       self[attr] = args[0]
-    when /\A#{ATTR_REGEXP}\z/
-      # Case "r.attr".
+    when /\A(#{ATTR_REGEXP})\z/
+      # Access.
+      attr = $1.to_sym
       if @strict
-        _smart_hash_fetch(method_name)
+        _smart_hash_fetch(attr)
       else
-        self[method_name]
+        self[attr]
       end
     else
       super

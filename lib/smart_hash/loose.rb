@@ -1,3 +1,5 @@
+require File.expand_path("../../smart_hash", __FILE__)
+
 class SmartHash < Hash
   # Non-strict SmartHash
   #
